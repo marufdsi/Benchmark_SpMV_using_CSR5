@@ -21,7 +21,7 @@ public:
     int spmv(const ANONYMOUSLIB_VT alpha, ANONYMOUSLIB_VT *y);
     int destroy();
     void setSigma(int sigma);
-    void getSigma();
+    int getSigma();
 
 private:
     int computeSigma();
