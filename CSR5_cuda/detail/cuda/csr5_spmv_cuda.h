@@ -405,7 +405,7 @@ void spmv_csr5_tail_partition_kernel(const iT           *d_row_pointer,
     for (iT idx = local_id + row_start; idx < row_stop; idx += ANONYMOUSLIB_CSR5_OMEGA)
         sum += candidate<iT, vT>(d_value, d_x, d_x_tex, d_column_index, idx, alpha);
 
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 300 // use shfl intrinsic
+#if __CUDA_ARCH__ >= 300 // use shfl intrinsic
     sum = sum_32_shfl<vT>(sum);
 #else
     volatile __shared__ vT s_sum[ANONYMOUSLIB_CSR5_OMEGA + ANONYMOUSLIB_CSR5_OMEGA / 2];
