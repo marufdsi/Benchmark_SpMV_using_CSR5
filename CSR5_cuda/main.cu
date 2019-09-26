@@ -14,6 +14,8 @@ using namespace std;
 #define NUM_RUN 1000
 #endif
 
+char  *matName;
+
 int call_anonymouslib(int m, int n, int nnzA,
                   int *csrRowPtrA, int *csrColIdxA, VALUE_TYPE *csrValA,
                   VALUE_TYPE *x, VALUE_TYPE *y, VALUE_TYPE alpha)
@@ -105,6 +107,30 @@ int call_anonymouslib(int m, int n, int nnzA,
              << " ms. Bandwidth = " << gb/(1.0e+6 * CSR5Spmv_time)
              << " GB/s. GFlops = " << gflop/(1.0e+6 * CSR5Spmv_time)  << " GFlops." << endl;
 
+    /// Export result set to the csv file
+    char outputFile[100] = "CSR5_SpMV_on_GPU.csv";
+    FILE *resultCSV;
+    FILE *checkFile;
+    if ((checkFile = fopen(outputFile, "r")) != NULL) {
+        // file exists
+        fclose(checkFile);
+        if (!(resultCSV = fopen(outputFile, "a"))) {
+            fprintf(stderr, "fopen: failed to open %s file\n", outputFile);
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        if (!(resultCSV = fopen(outputFile, "w"))) {
+            fprintf(stderr, "fopen: failed to open file %s\n",outputFile);
+            exit(EXIT_FAILURE);
+        }
+        fprintf(resultCSV, "Name,M,N,AvgTime,TotalRun,NonZeroPerRow,NonZeroElements,Bandwidth,Flops\n");
+    }
+
+    fprintf(resultCSV, "%s,%d,%d,%10.6lf,%d,%lf,%d,%lf,%lf\n", matName, m, n, CSR5Spmv_time, NUM_RUN, (double)nnzA/m, nnzA, gb/(1.0e+6 * CSR5Spmv_time), gflop/(1.0e+6 * CSR5Spmv_time));
+    if (fclose(resultCSV) != 0) {
+        fprintf(stderr, "fopen: failed to open file %s\n", outputFile);
+        exit(EXIT_FAILURE);
+    }
     A.destroy();
 
     checkCudaErrors(cudaFree(d_csrRowPtrA));
@@ -152,7 +178,9 @@ int main(int argc, char ** argv)
         filename = argv[argi];
         argi++;
     }
-    cout << "--------------" << filename << "--------------" << endl;
+    char *_ptr = strtok(in_file, "/");
+    matName = strtok(strtok(NULL, "-"), ".");
+    cout << "--------------" << matName << "--------------" << endl;
 
     // read matrix from mtx file
     int ret_code;
