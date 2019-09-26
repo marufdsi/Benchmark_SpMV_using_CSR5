@@ -161,9 +161,6 @@ int main(int argc, char ** argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     cout << "MPI Task " << rank << " of " << size << " starting...."<<endl;
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Finalize();
-    return 0;
 
     int m, n, nnzA;
     int *csrRowPtrA;
@@ -442,6 +439,9 @@ int main(int argc, char ** argv)
     free(x);
     free(y);
     free(y_ref);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Finalize();
 
     return 0;
 }
