@@ -1,7 +1,7 @@
 #compilers
-
+# -I/apps/pkg/openmpi/2.1.5/rhel7_u5/pbs/gnu/include/openmpi
 # MPI FLAGS
-MPIFLAGS = -I/apps/pkg/openmpi/2.1.5/rhel7_u5/pbs/gnu/include/ -I/apps/pkg/openmpi/2.1.5/rhel7_u5/pbs/gnu/include/openmpi -L/apps/pkg/openmpi/2.1.5/rhel7_u5/pbs/gnu/lib/
+MPIFLAGS = -I/apps/pkg/openmpi/2.1.5/rhel7_u5/pbs/gnu/include/ -L/apps/pkg/openmpi/2.1.5/rhel7_u5/pbs/gnu/lib/
 CFLAGS = -lmpi
 
 #GLOBAL_PARAMETERS
