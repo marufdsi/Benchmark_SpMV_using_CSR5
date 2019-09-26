@@ -14,6 +14,10 @@ using namespace std;
 #define NUM_RUN 1000
 #endif
 
+#ifndef _SIGMA
+#define _SIGMA -1
+#endif
+
 char  *matName;
 
 int call_anonymouslib(int m, int n, int nnzA,
@@ -65,7 +69,7 @@ int call_anonymouslib(int m, int n, int nnzA,
     err = A.setX(d_x); // you only need to do it once!
     //cout << "setX err = " << err << endl;
 
-    A.setSigma(ANONYMOUSLIB_AUTO_TUNED_SIGMA);
+    A.setSigma(_SIGMA);
 
     // warmup device
     A.warmup();
