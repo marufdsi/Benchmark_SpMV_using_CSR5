@@ -34,6 +34,8 @@ int call_anonymouslib(int m, int n, int nnzA,
     cudaGetDeviceProperties(&deviceProp, device_id);
 
     cout << "Device [" <<  device_id << "] " << deviceProp.name << ", " << " @ " << deviceProp.clockRate * 1e-3f << "MHz. " << endl;
+    cout << "Global Memory: " << deviceProp.totalGlobalMem << ", SM " << deviceProp.multiProcessorCount << " maxThreadsPerBlock " << deviceProp.maxThreadsPerBlock << endl;
+    cout << "maxThreadsDim: " << deviceProp.maxThreadsDim << ", warpSize " << deviceProp.warpSize <<  endl;
 
     double gb = getB<int, VALUE_TYPE>(m, nnzA);
     double gflop = getFLOP<int>(nnzA);
