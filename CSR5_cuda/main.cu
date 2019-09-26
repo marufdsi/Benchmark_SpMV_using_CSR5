@@ -156,15 +156,15 @@ int main(int argc, char ** argv)
 {
 
     int rank, size;
-    MPI_Init(&argc, &argv);
+    /*MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 //    cout << "MPI Task " << rank << " of " << size << " starting...."<<endl;
 
     MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Finalize();
+    MPI_Finalize();*/
     return 0;
-    
+
     int m, n, nnzA;
     int *csrRowPtrA;
     int *csrColIdxA;
