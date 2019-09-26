@@ -178,7 +178,7 @@ int main(int argc, char ** argv)
         filename = argv[argi];
         argi++;
     }
-    char *_ptr = strtok(in_file, "/");
+    char *_ptr = strtok(filename, "/");
     matName = strtok(strtok(NULL, "-"), ".");
     cout << "--------------" << matName << "--------------" << endl;
 
