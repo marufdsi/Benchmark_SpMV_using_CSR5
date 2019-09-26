@@ -1,5 +1,9 @@
 #compilers
 
+# MPI FLAGS
+MPIFLAGS = -I/apps/pkg/openmpi/2.1.5/rhel7_u5/pbs/gnu/include/ -I/apps/pkg/openmpi/2.1.5/rhel7_u5/pbs/gnu/include/openmpi -L/apps/pkg/openmpi/2.1.5/rhel7_u5/pbs/gnu/lib/
+CFLAGS = -lmpi
+
 #GLOBAL_PARAMETERS
 VALUE_TYPE = double
 NUM_RUN = 1000
@@ -14,4 +18,4 @@ CUDA_INCLUDES = -I$(CUDA_INSTALL_PATH)/include -I$(CUDA_INSTALL_PATH)/samples/co
 CUDA_LIBS = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart
 
 cuda:
-	nvcc $(NVCC_FLAGS) main.cu -o spmv $(CUDA_INCLUDES) $(CUDA_LIBS) -D VALUE_TYPE=$(VALUE_TYPE) -D NUM_RUN=$(NUM_RUN) -D _SIGMA=$(_SIGMA)
+	nvcc $(NVCC_FLAGS) main.cu -o spmv $(CUDA_INCLUDES) $(CUDA_LIBS) $(MPIFLAGS) $(CFLAGS) -D VALUE_TYPE=$(VALUE_TYPE) -D NUM_RUN=$(NUM_RUN) -D _SIGMA=$(_SIGMA)
