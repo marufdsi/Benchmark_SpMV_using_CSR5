@@ -78,11 +78,11 @@ int call_anonymouslib(int m, int n, int nnzA,
 
     // check correctness by running 1 time
     err = A.spmv(alpha, d_y);
-    cout << "spmv err = " << err << endl;
+    //cout << "spmv err = " << err << endl;
     checkCudaErrors(cudaMemcpy(y, d_y, m * sizeof(VALUE_TYPE), cudaMemcpyDeviceToHost));
 
     // warm up by running 50 times
-   /* if (NUM_RUN)
+    if (NUM_RUN)
     {
         for (int i = 0; i < 50; i++)
             err = A.spmv(alpha, d_y);
@@ -103,7 +103,7 @@ int call_anonymouslib(int m, int n, int nnzA,
     if (NUM_RUN)
         cout << "CSR5-based SpMV time = " << CSR5Spmv_time
              << " ms. Bandwidth = " << gb/(1.0e+6 * CSR5Spmv_time)
-             << " GB/s. GFlops = " << gflop/(1.0e+6 * CSR5Spmv_time)  << " GFlops." << endl;*/
+             << " GB/s. GFlops = " << gflop/(1.0e+6 * CSR5Spmv_time)  << " GFlops." << endl;
 
     A.destroy();
 
@@ -360,8 +360,7 @@ int main(int argc, char ** argv)
     // compare reference and anonymouslib results
     int error_count = 0;
     for (int i = 0; i < m; i++)
-//        if (abs(y_ref[i] - y[i]) > 0.01 * abs(y_ref[i]))
-        if (y_ref[i] != y[i])
+        if (abs(y_ref[i] - y[i]) > 0.01 * abs(y_ref[i]))
         {
             error_count++;
 //            cout << "ROW [ " << i << " ], NNZ SPAN: "

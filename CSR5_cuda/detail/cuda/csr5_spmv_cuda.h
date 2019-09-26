@@ -444,7 +444,7 @@ int csr5_spmv(const int                 sigma,
 
     int num_threads = ANONYMOUSLIB_THREAD_GROUP;
     int num_blocks = ceil ((double)(p-1) / (double)(num_threads / ANONYMOUSLIB_CSR5_OMEGA));
-
+    cout<<"sigma: "<< sigma <<endl;
     switch (sigma)
     {
     case 4:
