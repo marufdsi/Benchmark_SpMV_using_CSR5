@@ -18,6 +18,8 @@ using namespace std;
 #define _SIGMA -1
 #endif
 
+#include <mpi.h>
+
 char  *matName;
 
 int call_anonymouslib(int m, int n, int nnzA,
@@ -157,6 +159,15 @@ int main(int argc, char ** argv)
     int *csrColIdxA;
     VALUE_TYPE *csrValA;
 
+    int rank, size;
+    MPI_Init(&argc,&argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    cerr << "MPI Task " << rank << "/" << size - 1 << " starting....\n";
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Finalize();
+    return 0;
     // report precision of floating-point
     cout << "------------------------------------------------------" << endl;
     char  *precision;
