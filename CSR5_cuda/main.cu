@@ -355,11 +355,12 @@ int main(int argc, char ** argv)
          << " GB/s. GFlops = " << gflop/(1.0e+6 * ref_time)  << " GFlops." << endl << endl;
 
     // launch compute
-    call_anonymouslib(m, n, nnzA, csrRowPtrA, csrColIdxA, csrValA, x, y, alpha);
+    int dummy_m = 20000;
+    call_anonymouslib(dummy_m, n, nnzA, csrRowPtrA, csrColIdxA, csrValA, x, y, alpha);
 
     // compare reference and anonymouslib results
     int error_count = 0;
-    for (int i = 0; i < m; i++)
+    for (int i = 0; i < dummy_m; i++)
 //        if (abs(y_ref[i] - y[i]) > 0.01 * abs(y_ref[i]))
         if (y_ref[i] != y[i])
         {
@@ -382,7 +383,7 @@ int main(int argc, char ** argv)
     if (error_count == 0)
         cout << "Check... PASS!" << endl;
     else
-        cout << "Check... NO PASS! #Error = " << error_count << " out of " << m << " entries." << endl;
+        cout << "Check... NO PASS! #Error = " << error_count << " out of " << dummy_m << " entries." << endl;
 
     cout << "------------------------------------------------------" << endl;
 
