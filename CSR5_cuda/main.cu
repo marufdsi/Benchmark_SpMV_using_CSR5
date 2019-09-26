@@ -360,7 +360,8 @@ int main(int argc, char ** argv)
     // compare reference and anonymouslib results
     int error_count = 0;
     for (int i = 0; i < m; i++)
-        if (abs(y_ref[i] - y[i]) > 0.01 * abs(y_ref[i]))
+//        if (abs(y_ref[i] - y[i]) > 0.01 * abs(y_ref[i]))
+        if (y_ref[i] != y[i])
         {
             error_count++;
 //            cout << "ROW [ " << i << " ], NNZ SPAN: "
