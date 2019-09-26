@@ -1,3 +1,7 @@
 #!/bin/bash
 
-./spmv $in
+#./spmv $in
+
+module load openmpi
+
+mpirun -np $r ./spmv $in
