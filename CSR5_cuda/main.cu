@@ -127,7 +127,7 @@ int call_anonymouslib(int m, int n, int nnzA,
     }
 
     fprintf(resultCSV, "%s,%d,%d,%10.6lf,%d,%lf,%d,%lf,%lf,%d,%d\n", matName, m, n, CSR5Spmv_time, NUM_RUN, (double)nnzA/m,
-            nnzA, gb/(1.0e+6 * CSR5Spmv_time), gflop/(1.0e+6 * CSR5Spmv_time), ANONYMOUSLIB_CSR5_OMEGA * ANONYMOUSLIB_AUTO_TUNED_SIGMA,
+            nnzA, gb/(1.0e+6 * CSR5Spmv_time), gflop/(1.0e+6 * CSR5Spmv_time), ANONYMOUSLIB_CSR5_OMEGA * A.getSigma(),
             sizeof(VALUE_TYPE));
     if (fclose(resultCSV) != 0) {
         fprintf(stderr, "fopen: failed to open file %s\n", outputFile);

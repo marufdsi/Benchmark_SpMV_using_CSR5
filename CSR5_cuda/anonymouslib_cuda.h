@@ -21,6 +21,7 @@ public:
     int spmv(const ANONYMOUSLIB_VT alpha, ANONYMOUSLIB_VT *y);
     int destroy();
     void setSigma(int sigma);
+    void getSigma();
 
 private:
     int computeSigma();
@@ -289,6 +290,11 @@ int anonymouslibHandle<ANONYMOUSLIB_IT, ANONYMOUSLIB_UIT, ANONYMOUSLIB_VT>::dest
 {
     cudaDestroyTextureObject(_x_tex);
     return asCSR();
+}
+
+template <class ANONYMOUSLIB_IT, class ANONYMOUSLIB_UIT, class ANONYMOUSLIB_VT>
+int anonymouslibHandle<ANONYMOUSLIB_IT, ANONYMOUSLIB_UIT, ANONYMOUSLIB_VT>::getSigma(){
+    return _csr5_sigma;
 }
 
 template <class ANONYMOUSLIB_IT, class ANONYMOUSLIB_UIT, class ANONYMOUSLIB_VT>
