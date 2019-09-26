@@ -178,9 +178,7 @@ int main(int argc, char ** argv)
         filename = argv[argi];
         argi++;
     }
-    char *_ptr = strtok(filename, "/");
-    matName = strtok(strtok(NULL, "-"), ".");
-    cout << "--------------" << matName << "--------------" << endl;
+    cout << "--------------" << filename << "--------------" << endl;
 
     // read matrix from mtx file
     int ret_code;
@@ -193,6 +191,10 @@ int main(int argc, char ** argv)
     // load matrix
     if ((f = fopen(filename, "r")) == NULL)
         return -1;
+
+    /// Parse inpute file to get matrix name
+    char *_ptr = strtok(filename, "/");
+    matName = strtok(strtok(NULL, "-"), ".");
 
     if (mm_read_banner(f, &matcode) != 0)
     {
