@@ -21,7 +21,7 @@ using namespace std;
 #include <mpi.h>
 
 char  *matName;
-
+int rank;
 int call_anonymouslib(int m, int n, int nnzA,
                   int *csrRowPtrA, int *csrColIdxA, VALUE_TYPE *csrValA,
                   VALUE_TYPE *x, VALUE_TYPE *y, VALUE_TYPE alpha)
@@ -31,7 +31,7 @@ int call_anonymouslib(int m, int n, int nnzA,
 
     // set device
     int device_id = 0;
-    cudaSetDevice(device_id);
+    cudaSetDevice(rank);
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, device_id);
 
@@ -155,7 +155,7 @@ int call_anonymouslib(int m, int n, int nnzA,
 int main(int argc, char ** argv)
 {
 
-    int rank, size;
+    int size;
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
