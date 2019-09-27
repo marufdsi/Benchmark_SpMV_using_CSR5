@@ -197,8 +197,8 @@ int main(int argc, char ** argv)
         input = argv[argi];
         argi++;
     }
-    char *_ptr = strtok(input, ".");
-    sprintf(filename, "%s_%d.%s", _ptr, rank, strtok(NULL, "-"));
+    char *base = strtok(input, ".");
+    sprintf(filename, "%s_%d.%s", base, rank, strtok(NULL, "-"));
     cout << "--------------" << filename << "--------------" << endl;
 
     // read matrix from mtx file
