@@ -190,7 +190,7 @@ int main(int argc, char ** argv)
     //ex: ./spmv webbase-1M.mtx
     int argi = 1;
 
-    char  *filename;
+    char  filename[100];
     char *input;
     if(argc > argi)
     {
