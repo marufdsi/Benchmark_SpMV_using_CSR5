@@ -11,7 +11,7 @@ using namespace std;
 #endif
 
 #ifndef NUM_RUN
-#define NUM_RUN 1000
+#define NUM_RUN 50
 #endif
 
 #ifndef _SIGMA
@@ -20,12 +20,14 @@ using namespace std;
 
 #include <mpi.h>
 
-char  *matName;
-int rank;
+char *matName;
+int rank, row_rank, col_rank;
+MPI_Comm commrow;
+MPI_Comm commcol;
+
 int call_anonymouslib(int m, int n, int nnzA,
-                  int *csrRowPtrA, int *csrColIdxA, VALUE_TYPE *csrValA,
-                  VALUE_TYPE *x, VALUE_TYPE *y, VALUE_TYPE alpha)
-{
+                      int *csrRowPtrA, int *csrColIdxA, VALUE_TYPE *csrValA,
+                      VALUE_TYPE *x, VALUE_TYPE *y, VALUE_TYPE *mpi_y, VALUE_TYPE alpha, int nProcs, int nodes) {
     int err = 0;
     cudaError_t err_cuda = cudaSuccess;
 
@@ -35,9 +37,11 @@ int call_anonymouslib(int m, int n, int nnzA,
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, device_id);
 
-    cout << "Device [" <<  device_id << "] " << deviceProp.name << ", " << " @ " << deviceProp.clockRate * 1e-3f << "MHz. " << endl;
-    cout << "Global Memory: " << deviceProp.totalGlobalMem << ", SM " << deviceProp.multiProcessorCount << " maxThreadsPerBlock " << deviceProp.maxThreadsPerBlock << endl;
-    cout << "maxThreadsDim: " << deviceProp.maxThreadsDim << ", warpSize " << deviceProp.warpSize <<  endl;
+    cout << "Device [" << device_id << "] " << deviceProp.name << ", " << " @ " << deviceProp.clockRate * 1e-3f
+         << "MHz. " << endl;
+    cout << "Global Memory: " << deviceProp.totalGlobalMem << ", SM " << deviceProp.multiProcessorCount
+         << " maxThreadsPerBlock " << deviceProp.maxThreadsPerBlock << endl;
+    cout << "maxThreadsDim: " << deviceProp.maxThreadsDim << ", warpSize " << deviceProp.warpSize << endl;
 
     double gb = getB<int, VALUE_TYPE>(m, nnzA);
     double gflop = getFLOP<int>(nnzA);
@@ -50,20 +54,21 @@ int call_anonymouslib(int m, int n, int nnzA,
     VALUE_TYPE *d_y;
 
     // Matrix A
-    checkCudaErrors(cudaMalloc((void **)&d_csrRowPtrA, (m+1) * sizeof(int)));
-    checkCudaErrors(cudaMalloc((void **)&d_csrColIdxA, nnzA  * sizeof(int)));
-    checkCudaErrors(cudaMalloc((void **)&d_csrValA,    nnzA  * sizeof(VALUE_TYPE)));
+    checkCudaErrors(cudaMalloc((void **) &d_csrRowPtrA, (m + 1) * sizeof(int)));
+    checkCudaErrors(cudaMalloc((void **) &d_csrColIdxA, nnzA * sizeof(int)));
+    checkCudaErrors(cudaMalloc((void **) &d_csrValA, nnzA * sizeof(VALUE_TYPE)));
 
-    checkCudaErrors(cudaMemcpy(d_csrRowPtrA, csrRowPtrA, (m+1) * sizeof(int),   cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(d_csrColIdxA, csrColIdxA, nnzA  * sizeof(int),   cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(d_csrValA,    csrValA,    nnzA  * sizeof(VALUE_TYPE),   cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemcpy(d_csrRowPtrA, csrRowPtrA, (m + 1) * sizeof(int), cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemcpy(d_csrColIdxA, csrColIdxA, nnzA * sizeof(int), cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemcpy(d_csrValA, csrValA, nnzA * sizeof(VALUE_TYPE), cudaMemcpyHostToDevice));
 
     // Vector x
-    checkCudaErrors(cudaMalloc((void **)&d_x, n * sizeof(VALUE_TYPE)));
+    checkCudaErrors(cudaMalloc((void **) &d_x, n * sizeof(VALUE_TYPE)));
+    MPI_Bcast(x, N, MPI_FLOAT, col_rank, commcol);
     checkCudaErrors(cudaMemcpy(d_x, x, n * sizeof(VALUE_TYPE), cudaMemcpyHostToDevice));
 
     // Vector y
-    checkCudaErrors(cudaMalloc((void **)&d_y, m  * sizeof(VALUE_TYPE)));
+    checkCudaErrors(cudaMalloc((void **) &d_y, m * sizeof(VALUE_TYPE)));
     checkCudaErrors(cudaMemset(d_y, 0, m * sizeof(VALUE_TYPE)));
 
     anonymouslibHandle<int, unsigned int, VALUE_TYPE> A(m, n);
@@ -91,13 +96,9 @@ int call_anonymouslib(int m, int n, int nnzA,
     //cout << "spmv err = " << err << endl;
     checkCudaErrors(cudaMemcpy(y, d_y, m * sizeof(VALUE_TYPE), cudaMemcpyDeviceToHost));
 
-    // warm up by running 50 times
-    if (NUM_RUN)
-    {
-        for (int i = 0; i < 50; i++)
-            err = A.spmv(alpha, d_y);
-    }
-
+    // warm up by running 5 times
+    for (int i = 0; i < 5; i++)
+        err = A.spmv(alpha, d_y);
     err_cuda = cudaDeviceSynchronize();
 
     anonymouslib_timer CSR5Spmv_timer;
@@ -108,15 +109,16 @@ int call_anonymouslib(int m, int n, int nnzA,
         err = A.spmv(alpha, d_y);
     err_cuda = cudaDeviceSynchronize();
 
-    double CSR5Spmv_time = CSR5Spmv_timer.stop() / (double)NUM_RUN;
+    double CSR5Spmv_time = CSR5Spmv_timer.stop() / (double) NUM_RUN;
 
     if (NUM_RUN)
         cout << "CSR5-based SpMV time = " << CSR5Spmv_time
-             << " ms. Bandwidth = " << gb/(1.0e+6 * CSR5Spmv_time)
-             << " GB/s. GFlops = " << gflop/(1.0e+6 * CSR5Spmv_time)  << " GFlops." << endl;
+             << " ms. Bandwidth = " << gb / (1.0e+6 * CSR5Spmv_time)
+             << " GB/s. GFlops = " << gflop / (1.0e+6 * CSR5Spmv_time) << " GFlops." << endl;
 
     /// Export result set to the csv file
-    char outputFile[100] = "CSR5_SpMV_on_GPU.csv";
+    char outputFile[100];
+    sprintf(outputFile, "%d_%s", nProcs, "CSR5_SpMV_on_GPU.csv");
     FILE *resultCSV;
     FILE *checkFile;
     if ((checkFile = fopen(outputFile, "r")) != NULL) {
@@ -128,15 +130,18 @@ int call_anonymouslib(int m, int n, int nnzA,
         }
     } else {
         if (!(resultCSV = fopen(outputFile, "w"))) {
-            fprintf(stderr, "fopen: failed to open file %s\n",outputFile);
+            fprintf(stderr, "fopen: failed to open file %s\n", outputFile);
             exit(EXIT_FAILURE);
         }
-        fprintf(resultCSV, "Name,M,N,AvgTime,TotalRun,NonZeroPerRow,NonZeroElements,Bandwidth,Flops,Partition,ValueType\n");
+        fprintf(resultCSV,
+                "Name,M,N,AvgTime,TotalRun,NonZeroPerRow,NonZeroElements,Bandwidth,Flops,Partition,ValueType,Nodes\n");
     }
 
-    fprintf(resultCSV, "%s,%d,%d,%10.6lf,%d,%lf,%d,%lf,%lf,%d,%d\n", matName, m, n, CSR5Spmv_time, NUM_RUN, (double)nnzA/m,
-            nnzA, gb/(1.0e+6 * CSR5Spmv_time), gflop/(1.0e+6 * CSR5Spmv_time), ANONYMOUSLIB_CSR5_OMEGA * A.getSigma(),
-            sizeof(VALUE_TYPE));
+    fprintf(resultCSV, "%s,%d,%d,%10.6lf,%d,%lf,%d,%lf,%lf,%d,%d,%d\n", matName, m, n, CSR5Spmv_time, NUM_RUN,
+            (double) nnzA / m,
+            nnzA, gb / (1.0e+6 * CSR5Spmv_time), gflop / (1.0e+6 * CSR5Spmv_time),
+            ANONYMOUSLIB_CSR5_OMEGA * A.getSigma(),
+            sizeof(VALUE_TYPE), nodes);
     if (fclose(resultCSV) != 0) {
         fprintf(stderr, "fopen: failed to open file %s\n", outputFile);
         exit(EXIT_FAILURE);
@@ -152,34 +157,34 @@ int call_anonymouslib(int m, int n, int nnzA,
     return err;
 }
 
-int main(int argc, char ** argv)
-{
+int main(int argc, char **argv) {
 
-    int size;
+    int size, nodes = 0;
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    cout << "MPI Task " << rank << " of " << size << " starting...."<<endl;
-
-
+    cout << "MPI Task " << rank << " of " << size << " starting...." << endl;
     int m, n, nnzA;
     int *csrRowPtrA;
     int *csrColIdxA;
     VALUE_TYPE *csrValA;
 
+    int sqrRank = sqrt(size);
+    row_rank = rank / sqrRank; //which col of proc am I
+    col_rank = rank % sqrRank; //which row of proc am I
+
+    //initialize communicators
+    MPI_Comm_split(MPI_COMM_WORLD, row_rank, rank, &commrow);
+    MPI_Comm_split(MPI_COMM_WORLD, col_rank, rank, &commcol);
+
     // report precision of floating-point
     cout << "------------------------------------------------------" << endl;
-    char  *precision;
-    if (sizeof(VALUE_TYPE) == 4)
-    {
+    char *precision;
+    if (sizeof(VALUE_TYPE) == 4) {
         precision = "32-bit Single Precision";
-    }
-    else if (sizeof(VALUE_TYPE) == 8)
-    {
+    } else if (sizeof(VALUE_TYPE) == 8) {
         precision = "64-bit Double Precision";
-    }
-    else
-    {
+    } else {
         cout << "Wrong precision. Program exit!" << endl;
         return 0;
     }
@@ -190,11 +195,14 @@ int main(int argc, char ** argv)
     //ex: ./spmv webbase-1M.mtx
     int argi = 1;
 
-    char  filename[100];
+    char filename[100];
     char *input;
-    if(argc > argi)
-    {
+    if (argc > argi) {
         input = argv[argi];
+        argi++;
+    }
+    if (argc > argi) {
+        nodes = atoi(argv[argi]);
         argi++;
     }
     char *base = strtok(input, ".");
@@ -217,63 +225,57 @@ int main(int argc, char ** argv)
     char *_ptr = strtok(filename, "/");
     matName = strtok(strtok(NULL, "-"), ".");
 
-    if (mm_read_banner(f, &matcode) != 0)
-    {
+    if (mm_read_banner(f, &matcode) != 0) {
         cout << "Could not process Matrix Market banner." << endl;
         return -2;
     }
 
-    if ( mm_is_complex( matcode ) )
-    {
-        cout <<"Sorry, data type 'COMPLEX' is not supported. " << endl;
+    if (mm_is_complex(matcode)) {
+        cout << "Sorry, data type 'COMPLEX' is not supported. " << endl;
         return -3;
     }
 
-    if ( mm_is_pattern( matcode ) )  { isPattern = 1; /*cout << "type = Pattern" << endl;*/ }
-    if ( mm_is_real ( matcode) )     { isReal = 1; /*cout << "type = real" << endl;*/ }
-    if ( mm_is_integer ( matcode ) ) { isInteger = 1; /*cout << "type = integer" << endl;*/ }
+    if (mm_is_pattern(matcode)) { isPattern = 1; /*cout << "type = Pattern" << endl;*/ }
+    if (mm_is_real (matcode)) { isReal = 1; /*cout << "type = real" << endl;*/ }
+    if (mm_is_integer (matcode)) { isInteger = 1; /*cout << "type = integer" << endl;*/ }
 
     /* find out size of sparse matrix .... */
     ret_code = mm_read_mtx_crd_size(f, &m, &n, &nnzA_mtx_report);
     if (ret_code != 0)
         return -4;
 
-    if ( mm_is_symmetric( matcode ) || mm_is_hermitian( matcode ) )
-    {
+    if (mm_is_symmetric(matcode) || mm_is_hermitian(matcode)) {
         isSymmetric = 1;
         //cout << "symmetric = true" << endl;
-    }
-    else
-    {
+    } else {
         //cout << "symmetric = false" << endl;
     }
 
-    int *csrRowPtrA_counter = (int *)malloc((m+1) * sizeof(int));
-    memset(csrRowPtrA_counter, 0, (m+1) * sizeof(int));
+    int *csrRowPtrA_counter = (int *) malloc((m + 1) * sizeof(int));
+    for (int k = 0; k < m + 1; ++k) {
+        csrRowPtrA_counter[k] = 0;
+    }
+//    memset(csrRowPtrA_counter, 0, (m+1) * sizeof(int));
 
-    int *csrRowIdxA_tmp = (int *)malloc(nnzA_mtx_report * sizeof(int));
-    int *csrColIdxA_tmp = (int *)malloc(nnzA_mtx_report * sizeof(int));
-    VALUE_TYPE *csrValA_tmp    = (VALUE_TYPE *)malloc(nnzA_mtx_report * sizeof(VALUE_TYPE));
+    int *csrRowIdxA_tmp = (int *) malloc(nnzA_mtx_report * sizeof(int));
+    int *csrColIdxA_tmp = (int *) malloc(nnzA_mtx_report * sizeof(int));
+    VALUE_TYPE *csrValA_tmp = (VALUE_TYPE *) malloc(nnzA_mtx_report * sizeof(VALUE_TYPE));
 
     /* NOTE: when reading in doubles, ANSI C requires the use of the "l"  */
     /*   specifier as in "%lg", "%lf", "%le", otherwise errors will occur */
     /*  (ANSI C X3.159-1989, Sec. 4.9.6.2, p. 136 lines 13-15)            */
 
-    for (int i = 0; i < nnzA_mtx_report; i++)
-    {
+    for (int i = 0; i < nnzA_mtx_report; i++) {
         int idxi, idxj;
         double fval;
         int ival;
 
         if (isReal)
             fscanf(f, "%d %d %lg\n", &idxi, &idxj, &fval);
-        else if (isInteger)
-        {
+        else if (isInteger) {
             fscanf(f, "%d %d %d\n", &idxi, &idxj, &ival);
             fval = ival;
-        }
-        else if (isPattern)
-        {
+        } else if (isPattern) {
             fscanf(f, "%d %d\n", &idxi, &idxj);
             fval = 1.0;
         }
@@ -291,10 +293,8 @@ int main(int argc, char ** argv)
     if (f != stdin)
         fclose(f);
 
-    if (isSymmetric)
-    {
-        for (int i = 0; i < nnzA_mtx_report; i++)
-        {
+    if (isSymmetric) {
+        for (int i = 0; i < nnzA_mtx_report; i++) {
             if (csrRowIdxA_tmp[i] != csrColIdxA_tmp[i])
                 csrRowPtrA_counter[csrColIdxA_tmp[i]]++;
         }
@@ -305,27 +305,27 @@ int main(int argc, char ** argv)
 
     old_val = csrRowPtrA_counter[0];
     csrRowPtrA_counter[0] = 0;
-    for (int i = 1; i <= m; i++)
-    {
+    for (int i = 1; i <= m; i++) {
         new_val = csrRowPtrA_counter[i];
-        csrRowPtrA_counter[i] = old_val + csrRowPtrA_counter[i-1];
+        csrRowPtrA_counter[i] = old_val + csrRowPtrA_counter[i - 1];
         old_val = new_val;
     }
 
     nnzA = csrRowPtrA_counter[m];
-    csrRowPtrA = (int *)malloc((m+1) * sizeof(int));
-    memcpy(csrRowPtrA, csrRowPtrA_counter, (m+1) * sizeof(int));
-    memset(csrRowPtrA_counter, 0, (m+1) * sizeof(int));
+    csrRowPtrA = (int *) malloc((m + 1) * sizeof(int));
+//    memcpy(csrRowPtrA, csrRowPtrA_counter, (m+1) * sizeof(int));
+//    memset(csrRowPtrA_counter, 0, (m+1) * sizeof(int));
+    for (int k = 0; k < m + 1; ++k) {
+        csrRowPtrA[k] = csrRowPtrA_counter[k];
+        csrRowPtrA_counter[k] = 0;
+    }
 
-    csrColIdxA = (int *)malloc(nnzA * sizeof(int));
-    csrValA    = (VALUE_TYPE *)malloc(nnzA * sizeof(VALUE_TYPE));
+    csrColIdxA = (int *) malloc(nnzA * sizeof(int));
+    csrValA = (VALUE_TYPE *) malloc(nnzA * sizeof(VALUE_TYPE));
 
-    if (isSymmetric)
-    {
-        for (int i = 0; i < nnzA_mtx_report; i++)
-        {
-            if (csrRowIdxA_tmp[i] != csrColIdxA_tmp[i])
-            {
+    if (isSymmetric) {
+        for (int i = 0; i < nnzA_mtx_report; i++) {
+            if (csrRowIdxA_tmp[i] != csrColIdxA_tmp[i]) {
                 int offset = csrRowPtrA[csrRowIdxA_tmp[i]] + csrRowPtrA_counter[csrRowIdxA_tmp[i]];
                 csrColIdxA[offset] = csrColIdxA_tmp[i];
                 csrValA[offset] = csrValA_tmp[i];
@@ -335,20 +335,15 @@ int main(int argc, char ** argv)
                 csrColIdxA[offset] = csrRowIdxA_tmp[i];
                 csrValA[offset] = csrValA_tmp[i];
                 csrRowPtrA_counter[csrColIdxA_tmp[i]]++;
-            }
-            else
-            {
+            } else {
                 int offset = csrRowPtrA[csrRowIdxA_tmp[i]] + csrRowPtrA_counter[csrRowIdxA_tmp[i]];
                 csrColIdxA[offset] = csrColIdxA_tmp[i];
                 csrValA[offset] = csrValA_tmp[i];
                 csrRowPtrA_counter[csrRowIdxA_tmp[i]]++;
             }
         }
-    }
-    else
-    {
-        for (int i = 0; i < nnzA_mtx_report; i++)
-        {
+    } else {
+        for (int i = 0; i < nnzA_mtx_report; i++) {
             int offset = csrRowPtrA[csrRowIdxA_tmp[i]] + csrRowPtrA_counter[csrRowIdxA_tmp[i]];
             csrColIdxA[offset] = csrColIdxA_tmp[i];
             csrValA[offset] = csrValA_tmp[i];
@@ -365,19 +360,18 @@ int main(int argc, char ** argv)
     srand(time(NULL));
 
     // set csrValA to 1, easy for checking floating-point results
-    for (int i = 0; i < nnzA; i++)
-    {
+    for (int i = 0; i < nnzA; i++) {
         csrValA[i] = rand() % 10;
     }
 
     cout << " ( " << m << ", " << n << " ) nnz = " << nnzA << endl;
 
-    VALUE_TYPE *x = (VALUE_TYPE *)malloc(n * sizeof(VALUE_TYPE));
+    VALUE_TYPE *x = (VALUE_TYPE *) malloc(n * sizeof(VALUE_TYPE));
     for (int i = 0; i < n; i++)
         x[i] = rand() % 10;
 
-    VALUE_TYPE *y = (VALUE_TYPE *)malloc(m * sizeof(VALUE_TYPE));
-    VALUE_TYPE *y_ref = (VALUE_TYPE *)malloc(m * sizeof(VALUE_TYPE));
+    VALUE_TYPE *y = (VALUE_TYPE *) malloc(m * sizeof(VALUE_TYPE));
+    VALUE_TYPE *y_ref = (VALUE_TYPE *) malloc(m * sizeof(VALUE_TYPE));
 
     double gb = getB<int, VALUE_TYPE>(m, nnzA);
     double gflop = getFLOP<int>(nnzA);
@@ -389,30 +383,27 @@ int main(int argc, char ** argv)
     ref_timer.start();
 
     int ref_iter = 1;
-    for (int iter = 0; iter < ref_iter; iter++)
-    {
-        for (int i = 0; i < m; i++)
-        {
+    for (int iter = 0; iter < ref_iter; iter++) {
+        for (int i = 0; i < m; i++) {
             VALUE_TYPE sum = 0;
-            for (int j = csrRowPtrA[i]; j < csrRowPtrA[i+1]; j++)
+            for (int j = csrRowPtrA[i]; j < csrRowPtrA[i + 1]; j++)
                 sum += x[csrColIdxA[j]] * csrValA[j] * alpha;
             y_ref[i] = sum;
         }
     }
 
-    double ref_time = ref_timer.stop() / (double)ref_iter;
+    double ref_time = ref_timer.stop() / (double) ref_iter;
     cout << "cpu sequential time = " << ref_time
-         << " ms. Bandwidth = " << gb/(1.0e+6 * ref_time)
-         << " GB/s. GFlops = " << gflop/(1.0e+6 * ref_time)  << " GFlops." << endl << endl;
+         << " ms. Bandwidth = " << gb / (1.0e+6 * ref_time)
+         << " GB/s. GFlops = " << gflop / (1.0e+6 * ref_time) << " GFlops." << endl << endl;
 
     // launch compute
-    call_anonymouslib(m, n, nnzA, csrRowPtrA, csrColIdxA, csrValA, x, y, alpha);
+    call_anonymouslib(m, n, nnzA, csrRowPtrA, csrColIdxA, csrValA, x, y, alpha, size, nodes);
 
     // compare reference and anonymouslib results
     int error_count = 0;
     for (int i = 0; i < m; i++)
-        if (abs(y_ref[i] - y[i]) > 0.01 * abs(y_ref[i]))
-        {
+        if (abs(y_ref[i] - y[i]) > 0.01 * abs(y_ref[i])) {
             error_count++;
 //            cout << "ROW [ " << i << " ], NNZ SPAN: "
 //                 << csrRowPtrA[i] << " - "
