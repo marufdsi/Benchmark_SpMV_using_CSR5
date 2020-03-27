@@ -64,7 +64,7 @@ int call_anonymouslib(int m, int n, int nnzA,
 
     // Vector x
     checkCudaErrors(cudaMalloc((void **) &d_x, n * sizeof(VALUE_TYPE)));
-    MPI_Bcast(x, N, MPI_FLOAT, col_rank, commcol);
+    MPI_Bcast(x, n, MPI_FLOAT, col_rank, commcol);
     checkCudaErrors(cudaMemcpy(d_x, x, n * sizeof(VALUE_TYPE), cudaMemcpyHostToDevice));
 
     // Vector y
