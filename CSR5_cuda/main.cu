@@ -27,7 +27,7 @@ MPI_Comm commcol;
 
 int call_anonymouslib(int m, int n, int nnzA,
                       int *csrRowPtrA, int *csrColIdxA, VALUE_TYPE *csrValA,
-                      VALUE_TYPE *x, VALUE_TYPE *y, VALUE_TYPE *mpi_y, VALUE_TYPE alpha, int nProcs, int nodes) {
+                      VALUE_TYPE *x, VALUE_TYPE *y, VALUE_TYPE alpha, int nProcs, int nodes) {
     int err = 0;
     cudaError_t err_cuda = cudaSuccess;
 
